@@ -1,23 +1,12 @@
 # Brave Origin Portable
-
-A minimal project for running **Brave Origin** in portable mode. The entire project consists of only five files:
-
-```text
-1.update.bat
-2.unlock-brave-origin.bat
-3.register-default-browser.bat
-chrome++.ini
-version.dll
+Brave Origin Portable is a minimal project for running **Brave Origin** in portable mode. The entire project starts with just one file:
 ```
-
+update.bat
+```
+When you run `update.bat`, it automatically downloads and sets up everything you need, including Brave Origin, Chrome++ Next Mini, `unlock-brave-origin.bat`, `register-default-browser.bat`, `chrome++.ini`, and `version.dll`.
 ## First-time setup
-
-Run the following files in order:
-
-1. Run `1.update.bat` to download the latest version of Brave Origin.
-2. Run `2.unlock-brave-origin.bat` to unlock Brave Origin.
-3. If you want to use it as your default browser, run `3.register-default-browser.bat`.
-
+Run `update.bat`.
+It will automatically download Brave Origin, Chrome++ Next Mini, all required files, and unlock Brave Origin. No additional setup is required.
+If you want Brave Origin Portable to be your default browser, run `register-default-browser.bat` after the installation is complete.
 ## Updating
-
-After the initial setup, you only need to run `1.update.bat` whenever you want to update Brave Origin to a newer version.
+To update Brave Origin Portable to the latest version, simply run `update.bat` again.
