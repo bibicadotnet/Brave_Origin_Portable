@@ -39,7 +39,7 @@ exit /b
 :: .ps1 file and run it with -File (avoids the old
 :: [scriptblock]::Create() quoting bug entirely)
 :: ============================================================
-powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$c = (Get-Content -LiteralPath '%~f0' -Raw) -split '::PS_PAYLOAD::' | Select-Object -Last 1; $tmp = Join-Path $env:TEMP ('update_payload_' + [guid]::NewGuid().ToString('N') + '.ps1'); Set-Content -LiteralPath $tmp -Value $c -Encoding UTF8; try { & $tmp '%~dp0' } finally { Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue }"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$lines = Get-Content -LiteralPath '%~f0'; $idx = ($lines | Select-String -Pattern '^::PS_PAYLOAD::\s*$').LineNumber | Select-Object -Last 1; $c = ($lines[$idx..($lines.Count-1)]) -join [Environment]::NewLine; $tmp = Join-Path $env:TEMP ('update_payload_' + [guid]::NewGuid().ToString('N') + '.ps1'); Set-Content -LiteralPath $tmp -Value $c -Encoding UTF8; try { & $tmp '%~dp0' } finally { Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue }"
 
 if errorlevel 1 (
     echo.
@@ -167,8 +167,9 @@ try {
   if (Test-Path $unlockScript) {
       Write-Host "Running unlock-brave-origin..." -ForegroundColor Yellow
       try {
-          $marker = '::' + 'PS_PAYLOAD' + '::'
-          $uc = (Get-Content -LiteralPath $unlockScript -Raw) -split $marker | Select-Object -Last 1
+          $ulines = Get-Content -LiteralPath $unlockScript
+          $uidx = ($ulines | Select-String -Pattern '^::PS_PAYLOAD::\s*$').LineNumber | Select-Object -Last 1
+          $uc = ($ulines[$uidx..($ulines.Count-1)]) -join [Environment]::NewLine
           $utmp = Join-Path $env:TEMP ('unlock_payload_' + [guid]::NewGuid().ToString('N') + '.ps1')
           Set-Content -LiteralPath $utmp -Value $uc -Encoding UTF8
           try { & $utmp $currentDir } finally { Remove-Item -LiteralPath $utmp -Force -ErrorAction SilentlyContinue }
