@@ -4,26 +4,17 @@ setlocal enabledelayedexpansion
 if "%~1"=="/afterupdate" goto :RUN_PAYLOAD
 
 set "TMPBAT=%TEMP%\update_new_%RANDOM%.bat"
-# echo Checking for a newer version of update.bat...
 powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "try { (New-Object Net.WebClient).DownloadFile('https://raw.githubusercontent.com/bibicadotnet/Brave_Origin_Portable/main/update.bat', '%TMPBAT%') } catch { }"
 
-if exist "%TMPBAT%" goto :CHECK_DIFF
-echo Could not download the latest update.bat, continuing with the current version.
-goto :RUN_PAYLOAD
+if exist "%TMPBAT%" (
+    copy /y "%TMPBAT%" "%~f0" >nul
+    del "%TMPBAT%" >nul 2>&1
+    call "%~f0" /afterupdate
+    set "RC=!errorlevel!"
+    exit /b !RC!
+)
 
-:CHECK_DIFF
-fc /b "%TMPBAT%" "%~f0" >nul 2>&1
-if errorlevel 1 goto :DO_SELFUPDATE
-del "%TMPBAT%" >nul 2>&1
-echo update.bat is already the latest version.
 goto :RUN_PAYLOAD
-
-:DO_SELFUPDATE
-# echo A newer version of update.bat was found, updating...
-copy /y "%TMPBAT%" "%~f0" >nul
-del "%TMPBAT%" >nul 2>&1
-call "%~f0" /afterupdate
-exit /b
 
 :RUN_PAYLOAD
 
