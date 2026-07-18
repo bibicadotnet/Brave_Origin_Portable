@@ -126,7 +126,7 @@ try {
         if (Test-Path $unlockScript) {
             Write-Host "Running unlock-brave-origin.bat..." -ForegroundColor Yellow
             try {
-                Start-Process -FilePath $unlockScript -Wait
+                cmd.exe /c "`"$unlockScript`""
             } catch {
                 Write-Warning "Could not run unlock-brave-origin.bat automatically: $_"
             }
