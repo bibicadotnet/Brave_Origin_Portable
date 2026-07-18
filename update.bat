@@ -1,16 +1,11 @@
 @echo off
 setlocal enabledelayedexpansion
 
+echo Brave Origin Portable Updater v1.1
+echo ================================
+
 if "%~1"=="/afterupdate" goto :RUN_PAYLOAD
 
-:: ============================================================
-:: STEP 0: SELF-UPDATE (download the latest update.bat and
-:: re-launch it BEFORE doing anything else)
-:: NOTE: written with plain GOTO (no nested parentheses blocks),
-:: because jumping in/out of "IF (...) ELSE (...)" blocks near a
-:: label is unreliable in cmd.exe and can cause the rest of the
-:: file to be skipped.
-:: ============================================================
 set "TMPBAT=%TEMP%\update_new_%RANDOM%.bat"
 echo Checking for a newer version of update.bat...
 powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "try { (New-Object Net.WebClient).DownloadFile('https://raw.githubusercontent.com/bibicadotnet/Brave_Origin_Portable/main/update.bat', '%TMPBAT%') } catch { }"
@@ -34,11 +29,6 @@ call "%~f0" /afterupdate
 exit /b
 
 :RUN_PAYLOAD
-:: ============================================================
-:: STEP 1: extract the PowerShell payload below into a temp
-:: .ps1 file and run it with -File (avoids the old
-:: [scriptblock]::Create() quoting bug entirely)
-:: ============================================================
 powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$lines = Get-Content -LiteralPath '%~f0'; $idx = ($lines | Select-String -Pattern '^::PS_PAYLOAD::\s*$').LineNumber | Select-Object -Last 1; $c = ($lines[$idx..($lines.Count-1)]) -join [Environment]::NewLine; $tmp = Join-Path $env:TEMP ('update_payload_' + [guid]::NewGuid().ToString('N') + '.ps1'); Set-Content -LiteralPath $tmp -Value $c -Encoding UTF8; try { & $tmp '%~dp0' } finally { Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue }"
 
 if errorlevel 1 (
@@ -57,19 +47,9 @@ $apiUrl = "https://api.github.com/repos/brave/brave-browser/releases/latest"
 $tempDir = Join-Path $currentDir "BraveOriginUpdateTemp"
 
 try {
-  # 1. Download utility scripts and config files
-  Write-Host "Downloading helper files from GitHub..." -ForegroundColor Yellow
   $webClient = New-Object System.Net.WebClient
-  try {
-    $webClient.DownloadFile("https://raw.githubusercontent.com/bibicadotnet/Brave_Origin_Portable/main/unlock-brave-origin.bat", (Join-Path $currentDir "unlock-brave-origin.bat"))
-    $webClient.DownloadFile("https://raw.githubusercontent.com/bibicadotnet/Brave_Origin_Portable/main/register-default-browser.bat", (Join-Path $currentDir "register-default-browser.bat"))
-    $webClient.DownloadFile("https://raw.githubusercontent.com/bibicadotnet/Brave_Origin_Portable/main/chrome++.ini", (Join-Path $currentDir "chrome++.ini"))
-    Write-Host "Successfully updated helper files and chrome++.ini." -ForegroundColor Green
-  } catch {
-    Write-Warning "Failed to download helper files: $_"
-  }
 
-  # 2. Check Brave Version
+  # 1. Check Brave version (no downloads yet, just the version check)
   $currentVersion = if (Test-Path $exePath) { (Get-Item $exePath).VersionInfo.ProductVersion } else { "Not installed" }
   $release = Invoke-RestMethod -Uri $apiUrl
   $asset = $release.assets | Where-Object { $_.name -like "brave-origin-v*-win32-x64.zip" } | Select-Object -First 1
@@ -79,17 +59,25 @@ try {
   $latestVersion = "$chromiumMajor.$braveVersion"
   $downloadUrl = $asset.browser_download_url
 
-  Write-Host "Current version: $currentVersion" -ForegroundColor Yellow
-  Write-Host "Latest version: $latestVersion" -ForegroundColor Yellow
+  Write-Host "Current version: $currentVersion"
+  Write-Host "Latest version: $latestVersion"
   Write-Host
 
   $confirm = Read-Host "Do you want to update Brave and Chrome++? (y/N)"
   if ($confirm -ne 'y' -and $confirm -ne 'Y') { exit }
 
   if (Test-Path $exePath) {
-    Write-Host "Stopping Brave processes..."
     Stop-Process -Name brave,chrome_proxy,brave_crashpad_handler -Force -ErrorAction SilentlyContinue
     Start-Sleep 2
+  }
+
+  # 2. Download utility scripts and config files (only after confirmation)
+  try {
+    $webClient.DownloadFile("https://raw.githubusercontent.com/bibicadotnet/Brave_Origin_Portable/main/unlock-brave-origin.bat", (Join-Path $currentDir "unlock-brave-origin.bat"))
+    $webClient.DownloadFile("https://raw.githubusercontent.com/bibicadotnet/Brave_Origin_Portable/main/register-default-browser.bat", (Join-Path $currentDir "register-default-browser.bat"))
+    $webClient.DownloadFile("https://raw.githubusercontent.com/bibicadotnet/Brave_Origin_Portable/main/chrome++.ini", (Join-Path $currentDir "chrome++.ini"))
+  } catch {
+    Write-Warning "Failed to download helper files: $_"
   }
 
   if (Test-Path $tempDir) { Remove-Item $tempDir -Recurse -Force }
@@ -102,26 +90,22 @@ try {
   # 3. Download Brave
   Write-Host "Downloading Brave from: $downloadUrl"
   $webClient.DownloadFile($downloadUrl, $zipFile)
-
-  Write-Host "Extracting Brave..."
   Expand-Archive -Path $zipFile -DestinationPath $extractDir -Force
 
   $topDirs = Get-ChildItem $extractDir -Directory
   $topFiles = Get-ChildItem $extractDir -File
   if ($topDirs.Count -eq 1 -and $topFiles.Count -eq 0) { $extractedRoot = $topDirs[0].FullName } else { $extractedRoot = $extractDir }
 
-  Write-Host "Removing old files..."
   if (Test-Path (Join-Path $currentDir "brave.exe")) { Remove-Item (Join-Path $currentDir "brave.exe") -Force }
   Get-ChildItem $currentDir -Directory -ErrorAction SilentlyContinue | Where-Object { ($_.Name -replace '[0-9.]','') -eq '' } | ForEach-Object { Remove-Item $_.FullName -Recurse -Force }
 
-  Write-Host "Copying new files..."
   Get-ChildItem $extractedRoot -Recurse | ForEach-Object {
     $relativePath = $_.FullName.Substring($extractedRoot.Length + 1)
     $destPath = Join-Path $currentDir $relativePath
     if ($_.PSIsContainer) {
       New-Item -ItemType Directory -Path $destPath -Force | Out-Null
     } elseif ($_.Name -eq "chrome_proxy.exe") {
-      Write-Host "Skipping file: chrome_proxy.exe"
+      # intentionally skipped
     } else {
       $destFolder = Split-Path $destPath -Parent
       if (-not (Test-Path $destFolder)) { New-Item -ItemType Directory -Path $destFolder -Force | Out-Null }
@@ -130,7 +114,6 @@ try {
   }
 
   # 4. Download and Install Chrome++ Next Mini (version.dll only)
-  Write-Host "Downloading and installing Chrome++ Next Mini..."
   $chromeNextMiniApiUrl = "https://api.github.com/repos/bibicadotnet/chrome-next-mini/releases/latest"
   try {
     $chromeNextRelease = Invoke-RestMethod -Uri $chromeNextMiniApiUrl
@@ -142,7 +125,6 @@ try {
     Write-Host "Downloading Chrome++ Next Mini from: $chromeNextDownloadUrl"
     $webClient.DownloadFile($chromeNextDownloadUrl, $chromeNextZip)
 
-    Write-Host "Extracting Chrome++ Next Mini..."
     $chromeNextExtractDir = Join-Path $tempDir "chrome-next-mini-extracted"
     New-Item -ItemType Directory -Path $chromeNextExtractDir -Force | Out-Null
     Expand-Archive -Path $chromeNextZip -DestinationPath $chromeNextExtractDir -Force
@@ -150,9 +132,7 @@ try {
     $dllFile = Get-ChildItem $chromeNextExtractDir -Filter "version.dll" -Recurse | Select-Object -First 1
 
     if ($dllFile) {
-        Write-Host "Copying version.dll to the current directory..."
         Copy-Item $dllFile.FullName -Destination (Join-Path $currentDir "version.dll") -Force
-        Write-Host "Successfully installed Chrome++ Next Mini version.dll!" -ForegroundColor Green
     } else {
         throw "Could not find version.dll in the extracted zip file."
     }
@@ -165,7 +145,6 @@ try {
   #    make you press a key twice before update.bat can finish.)
   $unlockScript = Join-Path $currentDir "unlock-brave-origin.bat"
   if (Test-Path $unlockScript) {
-      Write-Host "Running unlock-brave-origin..." -ForegroundColor Yellow
       try {
           $ulines = Get-Content -LiteralPath $unlockScript
           $uidx = ($ulines | Select-String -Pattern '^::PS_PAYLOAD::\s*$').LineNumber | Select-Object -Last 1
