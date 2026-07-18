@@ -4,11 +4,9 @@ Download the latest package: [Brave Origin Portable Releases](https://github.com
 
 Extract `Brave_Origin_Portable.zip`. The extracted folder contains only one file:
 
-```text
+```
 update.bat
 ```
-
-Run `update.bat`. It automatically downloads and sets up everything you need, including Brave Origin, Chrome++ Next Mini, `unlock-brave-origin.bat`, `register-default-browser.bat`, `chrome++.ini`, and `version.dll`.
 
 ## First-time setup
 
