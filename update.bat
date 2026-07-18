@@ -66,7 +66,7 @@ try {
   Write-Host "Latest version: $latestVersion" -ForegroundColor Yellow
   Write-Host ""
   
-  $confirm = Read-Host "Do you want to update Brave and Chrome++? (y/N)"
+  $confirm = Read-Host "Do you want to update Brave Origin and Chrome++ Next Mini? (y/N)"
   if ($confirm -ne 'y' -and $confirm -ne 'Y') { exit }
   Write-Host ""
   
