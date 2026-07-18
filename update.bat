@@ -91,8 +91,8 @@ try {
   New-Item -ItemType Directory -Path $extractDir -Force | Out-Null
   $zipFile = Join-Path $downloadDir "update.zip"
 
-  # 3. Download Brave
-  Write-Host "Downloading Brave from: $downloadUrl"
+  # 3. Download Brave Origin
+  Write-Host "Downloading Brave Origin from: $downloadUrl"
   $webClient.DownloadFile($downloadUrl, $zipFile)
   Expand-Archive -Path $zipFile -DestinationPath $extractDir -Force
 
