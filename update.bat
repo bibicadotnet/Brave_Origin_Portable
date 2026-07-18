@@ -160,17 +160,17 @@ try {
     Write-Warning "Failed to install Chrome++ Next Mini: $_"
   }
 
-  # 5. Run unlock-brave-origin.bat directly, attached to the SAME console window
-  #    (Start-Process -NoNewWindow -Wait keeps it in this window instead of popping
-  #    a separate one, and lets its own self-contained batch/PS header run as designed)
+  # 5. Run only the PowerShell payload inside unlock-brave-origin.bat, in-process.
+  #    (Not launching the .bat itself: it ends with its own "pause", which would
+  #    make you press a key twice before update.bat can finish.)
   $unlockScript = Join-Path $currentDir "unlock-brave-origin.bat"
   if (Test-Path $unlockScript) {
       Write-Host "Running unlock-brave-origin..." -ForegroundColor Yellow
       try {
-          $p = Start-Process -FilePath $unlockScript -WorkingDirectory $currentDir -NoNewWindow -PassThru -Wait
-          if ($p.ExitCode -ne 0) {
-              Write-Warning "unlock-brave-origin exited with code $($p.ExitCode)"
-          }
+          $uc = (Get-Content -LiteralPath $unlockScript -Raw) -split '::PS_PAYLOAD::' | Select-Object -Last 1
+          $utmp = Join-Path $env:TEMP ('unlock_payload_' + [guid]::NewGuid().ToString('N') + '.ps1')
+          Set-Content -LiteralPath $utmp -Value $uc -Encoding UTF8
+          try { & $utmp $currentDir } finally { Remove-Item -LiteralPath $utmp -Force -ErrorAction SilentlyContinue }
       } catch {
           Write-Warning "Could not run unlock-brave-origin: $_"
       }
