@@ -24,15 +24,16 @@ $apiUrl = "https://api.github.com/repos/brave/brave-browser/releases/latest"
 $tempDir = Join-Path $currentDir "BraveOriginUpdateTemp"
 
 try {
-  # 1. Download utility scripts
-  Write-Host "Downloading helper batch files from GitHub..." -ForegroundColor Yellow
+  # 1. Download utility scripts and config files
+  Write-Host "Downloading helper files from GitHub..." -ForegroundColor Yellow
   $webClient = New-Object System.Net.WebClient
   try {
     $webClient.DownloadFile("https://raw.githubusercontent.com/bibicadotnet/Brave_Origin_Portable/main/unlock-brave-origin.bat", (Join-Path $currentDir "unlock-brave-origin.bat"))
     $webClient.DownloadFile("https://raw.githubusercontent.com/bibicadotnet/Brave_Origin_Portable/main/register-default-browser.bat", (Join-Path $currentDir "register-default-browser.bat"))
-    Write-Host "Successfully updated unlock-brave-origin.bat and register-default-browser.bat." -ForegroundColor Green
+    $webClient.DownloadFile("https://raw.githubusercontent.com/bibicadotnet/Brave_Origin_Portable/main/chrome++.ini", (Join-Path $currentDir "chrome++.ini"))
+    Write-Host "Successfully updated unlock-brave-origin.bat, register-default-browser.bat, and chrome++.ini." -ForegroundColor Green
   } catch {
-    Write-Warning "Failed to download helper batch files: $_"
+    Write-Warning "Failed to download helper files: $_"
   }
 
   # 2. Check Brave Version
@@ -113,14 +114,12 @@ try {
     New-Item -ItemType Directory -Path $chromeNextExtractDir -Force | Out-Null
     Expand-Archive -Path $chromeNextZip -DestinationPath $chromeNextExtractDir -Force
 
-    $iniFile = Get-ChildItem $chromeNextExtractDir -Filter "chrome++.ini" -Recurse | Select-Object -First 1
     $dllFile = Get-ChildItem $chromeNextExtractDir -Filter "version.dll" -Recurse | Select-Object -First 1
 
-    if ($iniFile -and $dllFile) {
-        Write-Host "Copying chrome++.ini and version.dll to the current directory..."
-        Copy-Item $iniFile.FullName -Destination (Join-Path $currentDir "chrome++.ini") -Force
+    if ($dllFile) {
+        Write-Host "Copying version.dll to the current directory..."
         Copy-Item $dllFile.FullName -Destination (Join-Path $currentDir "version.dll") -Force
-        Write-Host "Successfully installed Chrome++ Next Mini!" -ForegroundColor Green
+        Write-Host "Successfully installed Chrome++ Next Mini version.dll!" -ForegroundColor Green
 
         # Run unlock-brave-origin.bat automatically
         $unlockScript = Join-Path $currentDir "unlock-brave-origin.bat"
@@ -133,7 +132,7 @@ try {
             }
         }
     } else {
-        throw "Could not find chrome++.ini or version.dll in the extracted zip file."
+        throw "Could not find version.dll in the extracted zip file."
     }
   } catch {
     Write-Warning "Failed to install Chrome++ Next Mini: $_"
