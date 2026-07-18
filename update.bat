@@ -1,40 +1,51 @@
 @echo off
 setlocal enabledelayedexpansion
-chcp 65001 >nul
 
 if "%~1"=="/afterupdate" goto :RUN_PAYLOAD
 
 :: ============================================================
-:: BUOC 0: TU CAP NHAT CHINH NO (update.bat) TRUOC KHI CHAY
+:: STEP 0: SELF-UPDATE (download the latest update.bat and
+:: re-launch it BEFORE doing anything else)
+:: NOTE: written with plain GOTO (no nested parentheses blocks),
+:: because jumping in/out of "IF (...) ELSE (...)" blocks near a
+:: label is unreliable in cmd.exe and can cause the rest of the
+:: file to be skipped.
 :: ============================================================
 set "TMPBAT=%TEMP%\update_new_%RANDOM%.bat"
-echo Dang kiem tra phien ban moi cua update.bat...
-powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ^
-  "try { (New-Object Net.WebClient).DownloadFile('https://raw.githubusercontent.com/bibicadotnet/Brave_Origin_Portable/main/update.bat', '%TMPBAT%') } catch { }"
+echo Checking for a newer version of update.bat...
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "try { (New-Object Net.WebClient).DownloadFile('https://raw.githubusercontent.com/bibicadotnet/Brave_Origin_Portable/main/update.bat', '%TMPBAT%') } catch { }"
 
-if exist "%TMPBAT%" (
-    fc /b "%TMPBAT%" "%~f0" >nul 2>&1
-    if errorlevel 1 (
-        echo Phat hien phien ban moi, dang cap nhat update.bat...
-        copy /y "%TMPBAT%" "%~f0" >nul
-        del "%TMPBAT%" >nul 2>&1
-        call "%~f0" /afterupdate %*
-        exit /b
-    ) else (
-        del "%TMPBAT%" >nul 2>&1
-        echo update.bat da la phien ban moi nhat.
-    )
-) else (
-    echo Khong tai duoc phien ban moi, tiep tuc voi phien ban hien tai.
-)
+if exist "%TMPBAT%" goto :CHECK_DIFF
+echo Could not download the latest update.bat, continuing with the current version.
+goto :RUN_PAYLOAD
+
+:CHECK_DIFF
+fc /b "%TMPBAT%" "%~f0" >nul 2>&1
+if errorlevel 1 goto :DO_SELFUPDATE
+del "%TMPBAT%" >nul 2>&1
+echo update.bat is already the latest version.
+goto :RUN_PAYLOAD
+
+:DO_SELFUPDATE
+echo A newer version of update.bat was found, updating...
+copy /y "%TMPBAT%" "%~f0" >nul
+del "%TMPBAT%" >nul 2>&1
+call "%~f0" /afterupdate
+exit /b
 
 :RUN_PAYLOAD
 :: ============================================================
-:: BUOC 1: TACH PHAN POWERSHELL RA FILE TAM ROI CHAY (khong con
-:: bi loi thieu dau nhay do dung [scriptblock]::Create tren chuoi)
+:: STEP 1: extract the PowerShell payload below into a temp
+:: .ps1 file and run it with -File (avoids the old
+:: [scriptblock]::Create() quoting bug entirely)
 :: ============================================================
-powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ^
-  "$c = (Get-Content -LiteralPath '%~f0' -Raw) -split '::PS_PAYLOAD::',2 | Select-Object -Last 1; $tmp = Join-Path $env:TEMP ('update_payload_' + [guid]::NewGuid().ToString('N') + '.ps1'); Set-Content -LiteralPath $tmp -Value $c -Encoding UTF8; try { & $tmp '%~dp0' } finally { Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue }"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$c = (Get-Content -LiteralPath '%~f0' -Raw) -split '::PS_PAYLOAD::',2 | Select-Object -Last 1; $tmp = Join-Path $env:TEMP ('update_payload_' + [guid]::NewGuid().ToString('N') + '.ps1'); Set-Content -LiteralPath $tmp -Value $c -Encoding UTF8; try { & $tmp '%~dp0' } finally { Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue }"
+
+if errorlevel 1 (
+    echo.
+    echo update.bat exited with an error. See the output above.
+    pause
+)
 
 exit /b
 
