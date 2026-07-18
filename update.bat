@@ -39,7 +39,7 @@ exit /b
 :: .ps1 file and run it with -File (avoids the old
 :: [scriptblock]::Create() quoting bug entirely)
 :: ============================================================
-powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$c = (Get-Content -LiteralPath '%~f0' -Raw) -split '::PS_PAYLOAD::',2 | Select-Object -Last 1; $tmp = Join-Path $env:TEMP ('update_payload_' + [guid]::NewGuid().ToString('N') + '.ps1'); Set-Content -LiteralPath $tmp -Value $c -Encoding UTF8; try { & $tmp '%~dp0' } finally { Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue }"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$c = (Get-Content -LiteralPath '%~f0' -Raw) -split '::PS_PAYLOAD::' | Select-Object -Last 1; $tmp = Join-Path $env:TEMP ('update_payload_' + [guid]::NewGuid().ToString('N') + '.ps1'); Set-Content -LiteralPath $tmp -Value $c -Encoding UTF8; try { & $tmp '%~dp0' } finally { Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue }"
 
 if errorlevel 1 (
     echo.
