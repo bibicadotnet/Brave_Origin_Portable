@@ -1,18 +1,6 @@
 @echo off
 setlocal
 chcp 65001 >nul
-
-:: If called with `--no-self-update`, skip the update check and proceed to main code.
-if "%~1"=="--no-self-update" (
-    goto :main
-)
-
-echo Checking for updates to update.bat...
-powershell -NoProfile -ExecutionPolicy Bypass -Command "try { $url = 'https://raw.githubusercontent.com/bibicadotnet/Brave_Origin_Portable/main/update.bat'; $dest = '%~dp0update.bat'; $temp = Join-Path $env:TEMP 'update.bat.tmp'; (New-Object System.Net.WebClient).DownloadFile($url, $temp); if (Test-Path $temp) { Move-Item -Path $temp -Destination $dest -Force -ErrorAction Stop } } catch { Write-Warning 'Could not automatically update update.bat from GitHub. Using local version.' }"
-
-call "%~dp0update.bat" --no-self-update %* & exit
-
-:main
 powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$c = (Get-Content '%~f0' -Raw) -split '::PS_PAYLOAD::' | Select-Object -Last 1; Invoke-Command -ScriptBlock ([scriptblock]::Create($c)) -ArgumentList '%~dp0'"
 exit /b
 
@@ -31,7 +19,7 @@ try {
     $webClient.DownloadFile("https://raw.githubusercontent.com/bibicadotnet/Brave_Origin_Portable/main/unlock-brave-origin.bat", (Join-Path $currentDir "unlock-brave-origin.bat"))
     $webClient.DownloadFile("https://raw.githubusercontent.com/bibicadotnet/Brave_Origin_Portable/main/register-default-browser.bat", (Join-Path $currentDir "register-default-browser.bat"))
     $webClient.DownloadFile("https://raw.githubusercontent.com/bibicadotnet/Brave_Origin_Portable/main/chrome++.ini", (Join-Path $currentDir "chrome++.ini"))
-    Write-Host "Successfully updated unlock-brave-origin.bat, register-default-browser.bat, and chrome++.ini." -ForegroundColor Green
+    Write-Host "Successfully updated helper files and chrome++.ini." -ForegroundColor Green
   } catch {
     Write-Warning "Failed to download helper files: $_"
   }
@@ -96,7 +84,7 @@ try {
     }
   }
 
-  # 4. Download and Install Chrome++ Next Mini
+  # 4. Download and Install Chrome++ Next Mini (version.dll only)
   Write-Host "Downloading and installing Chrome++ Next Mini..."
   $chromeNextMiniApiUrl = "https://api.github.com/repos/bibicadotnet/chrome-next-mini/releases/latest"
   try {
@@ -120,29 +108,26 @@ try {
         Write-Host "Copying version.dll to the current directory..."
         Copy-Item $dllFile.FullName -Destination (Join-Path $currentDir "version.dll") -Force
         Write-Host "Successfully installed Chrome++ Next Mini version.dll!" -ForegroundColor Green
-
-        # Run unlock-brave-origin.bat automatically (inline to preserve console window and font settings)
-        $unlockScript = Join-Path $currentDir "unlock-brave-origin.bat"
-        if (Test-Path $unlockScript) {
-            Write-Host "Running unlock-brave-origin.bat..." -ForegroundColor Yellow
-            try {
-                $unlockContent = Get-Content $unlockScript -Raw
-                $unlockScriptBlockText = $unlockContent -split '::PS_PAYLOAD::' | Select-Object -Last 1
-                if ($unlockScriptBlockText) {
-                    $sb = [scriptblock]::Create($unlockScriptBlockText)
-                    Invoke-Command -ScriptBlock $sb -ArgumentList $currentDir
-                } else {
-                    Write-Warning "Could not parse payload from unlock-brave-origin.bat"
-                }
-            } catch {
-                Write-Warning "Could not run unlock-brave-origin.bat automatically: $_"
-            }
-        }
     } else {
         throw "Could not find version.dll in the extracted zip file."
     }
   } catch {
     Write-Warning "Failed to install Chrome++ Next Mini: $_"
+  }
+
+  # 5. Run unlock-brave-origin inline (parse its PowerShell payload directly)
+  $unlockScript = Join-Path $currentDir "unlock-brave-origin.bat"
+  if (Test-Path $unlockScript) {
+      Write-Host "Running unlock-brave-origin..." -ForegroundColor Yellow
+      try {
+          $unlockContent = Get-Content $unlockScript -Raw
+          $unlockPayload = ($unlockContent -split '::PS_PAYLOAD::' | Select-Object -Last 1)
+          if ($unlockPayload) {
+              Invoke-Command -ScriptBlock ([scriptblock]::Create($unlockPayload)) -ArgumentList $currentDir
+          }
+      } catch {
+          Write-Warning "Could not run unlock-brave-origin: $_"
+      }
   }
 
   Remove-Item $tempDir -Recurse -Force
@@ -152,6 +137,16 @@ try {
   } else {
     Write-Host "Error or update failed. Expected: $latestVersion, Actual: $newVersion" -ForegroundColor Yellow
   }
+
+  # 6. Self-update: download latest update.bat from GitHub (takes effect on next run)
+  # This MUST be the last step so the file is only overwritten after all code has been read into memory
+  try {
+    $tmpFile = Join-Path $env:TEMP "update.bat.tmp"
+    (New-Object System.Net.WebClient).DownloadFile("https://raw.githubusercontent.com/bibicadotnet/Brave_Origin_Portable/main/update.bat", $tmpFile)
+    if (Test-Path $tmpFile) {
+      Move-Item -Path $tmpFile -Destination (Join-Path $currentDir "update.bat") -Force
+    }
+  } catch { }
 
 } catch {
   Write-Host "Error: $_" -ForegroundColor Red
