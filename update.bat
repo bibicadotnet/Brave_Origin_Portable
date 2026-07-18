@@ -10,7 +10,7 @@ if "%~1"=="--no-self-update" (
 echo Checking for updates to update.bat...
 powershell -NoProfile -ExecutionPolicy Bypass -Command "try { $url = 'https://raw.githubusercontent.com/bibicadotnet/Brave_Origin_Portable/main/update.bat'; $dest = '%~dp0update.bat'; $temp = Join-Path $env:TEMP 'update.bat.tmp'; (New-Object System.Net.WebClient).DownloadFile($url, $temp); if (Test-Path $temp) { Move-Item -Path $temp -Destination $dest -Force -ErrorAction Stop } } catch { Write-Warning 'Could not automatically update update.bat from GitHub. Using local version.' }"
 
-cmd /c "%~dp0update.bat" --no-self-update %* & exit
+call "%~dp0update.bat" --no-self-update %* & exit
 
 :main
 powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$c = (Get-Content '%~f0' -Raw) -split '::PS_PAYLOAD::' | Select-Object -Last 1; Invoke-Command -ScriptBlock ([scriptblock]::Create($c)) -ArgumentList '%~dp0'"
@@ -121,12 +121,19 @@ try {
         Copy-Item $dllFile.FullName -Destination (Join-Path $currentDir "version.dll") -Force
         Write-Host "Successfully installed Chrome++ Next Mini version.dll!" -ForegroundColor Green
 
-        # Run unlock-brave-origin.bat automatically
+        # Run unlock-brave-origin.bat automatically (inline to preserve console window and font settings)
         $unlockScript = Join-Path $currentDir "unlock-brave-origin.bat"
         if (Test-Path $unlockScript) {
             Write-Host "Running unlock-brave-origin.bat..." -ForegroundColor Yellow
             try {
-                cmd.exe /c "`"$unlockScript`""
+                $unlockContent = Get-Content $unlockScript -Raw
+                $unlockScriptBlockText = $unlockContent -split '::PS_PAYLOAD::' | Select-Object -Last 1
+                if ($unlockScriptBlockText) {
+                    $sb = [scriptblock]::Create($unlockScriptBlockText)
+                    Invoke-Command -ScriptBlock $sb -ArgumentList $currentDir
+                } else {
+                    Write-Warning "Could not parse payload from unlock-brave-origin.bat"
+                }
             } catch {
                 Write-Warning "Could not run unlock-brave-origin.bat automatically: $_"
             }
