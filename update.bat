@@ -1,15 +1,13 @@
 @echo off
 setlocal enabledelayedexpansion
-
-echo Brave Origin Portable Updater v1.1
-echo ================================
-
 if "%~1"=="/afterupdate" goto :RUN_PAYLOAD
 
 set "TMPBAT=%TEMP%\update_new_%RANDOM%.bat"
 echo Checking for a newer version of update.bat...
 powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "try { (New-Object Net.WebClient).DownloadFile('https://raw.githubusercontent.com/bibicadotnet/Brave_Origin_Portable/main/update.bat', '%TMPBAT%') } catch { }"
 
+echo Brave Origin Portable Updater v1.1
+echo ================================
 if exist "%TMPBAT%" goto :CHECK_DIFF
 echo Could not download the latest update.bat, continuing with the current version.
 goto :RUN_PAYLOAD
