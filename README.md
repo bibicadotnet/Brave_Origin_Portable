@@ -14,6 +14,20 @@ Run `update.bat`.
 
 It will download Brave Origin, Chrome++ Next Mini, all required files, and unlock Brave Origin automatically.
 
+```
+Brave_Origin_Portable
+├── Brave
+│   ├── 150.1.92.141
+│   ├── brave.exe
+│   ├── chrome++.ini
+│   ├── register-default-browser.bat
+│   ├── unlock-brave-origin.bat
+│   ├── update.bat
+│   └── version.dll
+├── Cache
+└── Data
+```
+
 If you want Brave Origin Portable to be your default browser, run `register-default-browser.bat` after the installation is complete.
 
 ## Updating
