@@ -167,7 +167,8 @@ try {
   if (Test-Path $unlockScript) {
       Write-Host "Running unlock-brave-origin..." -ForegroundColor Yellow
       try {
-          $uc = (Get-Content -LiteralPath $unlockScript -Raw) -split '::PS_PAYLOAD::' | Select-Object -Last 1
+          $marker = '::' + 'PS_PAYLOAD' + '::'
+          $uc = (Get-Content -LiteralPath $unlockScript -Raw) -split $marker | Select-Object -Last 1
           $utmp = Join-Path $env:TEMP ('unlock_payload_' + [guid]::NewGuid().ToString('N') + '.ps1')
           Set-Content -LiteralPath $utmp -Value $uc -Encoding UTF8
           try { & $utmp $currentDir } finally { Remove-Item -LiteralPath $utmp -Force -ErrorAction SilentlyContinue }
