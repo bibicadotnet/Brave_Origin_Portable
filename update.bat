@@ -3,14 +3,6 @@ setlocal enabledelayedexpansion
 
 if "%~1"=="/afterupdate" goto :RUN_PAYLOAD
 
-:: ============================================================
-:: STEP 0: SELF-UPDATE (download the latest update.bat and
-:: re-launch it BEFORE doing anything else)
-:: NOTE: written with plain GOTO (no nested parentheses blocks),
-:: because jumping in/out of "IF (...) ELSE (...)" blocks near a
-:: label is unreliable in cmd.exe and can cause the rest of the
-:: file to be skipped.
-:: ============================================================
 set "TMPBAT=%TEMP%\update_new_%RANDOM%.bat"
 echo Checking for a newer version of update.bat...
 powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "try { (New-Object Net.WebClient).DownloadFile('https://raw.githubusercontent.com/bibicadotnet/Brave_Origin_Portable/main/update.bat', '%TMPBAT%') } catch { }"
@@ -34,11 +26,7 @@ call "%~f0" /afterupdate
 exit /b
 
 :RUN_PAYLOAD
-:: ============================================================
-:: STEP 1: extract the PowerShell payload below into a temp
-:: .ps1 file and run it with -File (avoids the old
-:: [scriptblock]::Create() quoting bug entirely)
-:: ============================================================
+
 powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$lines = Get-Content -LiteralPath '%~f0'; $idx = ($lines | Select-String -Pattern '^::PS_PAYLOAD::\s*$').LineNumber | Select-Object -Last 1; $c = ($lines[$idx..($lines.Count-1)]) -join [Environment]::NewLine; $tmp = Join-Path $env:TEMP ('update_payload_' + [guid]::NewGuid().ToString('N') + '.ps1'); Set-Content -LiteralPath $tmp -Value $c -Encoding UTF8; try { & $tmp '%~dp0' } finally { Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue }"
 
 if errorlevel 1 (
@@ -76,10 +64,12 @@ try {
 
   Write-Host "Current version: $currentVersion" -ForegroundColor Yellow
   Write-Host "Latest version: $latestVersion" -ForegroundColor Yellow
-
+  Write-Host ""
+  
   $confirm = Read-Host "Do you want to update Brave and Chrome++? (y/N)"
   if ($confirm -ne 'y' -and $confirm -ne 'Y') { exit }
-
+  Write-Host ""
+  
   if (Test-Path $exePath) {
     Stop-Process -Name brave,chrome_proxy,brave_crashpad_handler -Force -ErrorAction SilentlyContinue
     Start-Sleep 2
@@ -138,7 +128,8 @@ try {
 
     Write-Host "Downloading Chrome++ Next Mini from: $chromeNextDownloadUrl"
     $webClient.DownloadFile($chromeNextDownloadUrl, $chromeNextZip)
-
+	Write-Host ""
+	
     $chromeNextExtractDir = Join-Path $tempDir "chrome-next-mini-extracted"
     New-Item -ItemType Directory -Path $chromeNextExtractDir -Force | Out-Null
     Expand-Archive -Path $chromeNextZip -DestinationPath $chromeNextExtractDir -Force
@@ -183,4 +174,5 @@ try {
   Write-Host "Error: $_" -ForegroundColor Red
 }
 
+Write-Host ""
 Read-Host "Press Enter to exit"
