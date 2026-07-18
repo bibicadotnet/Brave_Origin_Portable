@@ -1,13 +1,20 @@
 @echo off
 setlocal enabledelayedexpansion
+
 if "%~1"=="/afterupdate" goto :RUN_PAYLOAD
 
+:: ============================================================
+:: STEP 0: SELF-UPDATE (download the latest update.bat and
+:: re-launch it BEFORE doing anything else)
+:: NOTE: written with plain GOTO (no nested parentheses blocks),
+:: because jumping in/out of "IF (...) ELSE (...)" blocks near a
+:: label is unreliable in cmd.exe and can cause the rest of the
+:: file to be skipped.
+:: ============================================================
 set "TMPBAT=%TEMP%\update_new_%RANDOM%.bat"
 echo Checking for a newer version of update.bat...
 powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "try { (New-Object Net.WebClient).DownloadFile('https://raw.githubusercontent.com/bibicadotnet/Brave_Origin_Portable/main/update.bat', '%TMPBAT%') } catch { }"
 
-echo Brave Origin Portable Updater v1.1
-echo ================================
 if exist "%TMPBAT%" goto :CHECK_DIFF
 echo Could not download the latest update.bat, continuing with the current version.
 goto :RUN_PAYLOAD
@@ -27,6 +34,11 @@ call "%~f0" /afterupdate
 exit /b
 
 :RUN_PAYLOAD
+:: ============================================================
+:: STEP 1: extract the PowerShell payload below into a temp
+:: .ps1 file and run it with -File (avoids the old
+:: [scriptblock]::Create() quoting bug entirely)
+:: ============================================================
 powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$lines = Get-Content -LiteralPath '%~f0'; $idx = ($lines | Select-String -Pattern '^::PS_PAYLOAD::\s*$').LineNumber | Select-Object -Last 1; $c = ($lines[$idx..($lines.Count-1)]) -join [Environment]::NewLine; $tmp = Join-Path $env:TEMP ('update_payload_' + [guid]::NewGuid().ToString('N') + '.ps1'); Set-Content -LiteralPath $tmp -Value $c -Encoding UTF8; try { & $tmp '%~dp0' } finally { Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue }"
 
 if errorlevel 1 (
@@ -47,6 +59,11 @@ $tempDir = Join-Path $currentDir "BraveOriginUpdateTemp"
 try {
   $webClient = New-Object System.Net.WebClient
 
+  Write-Host ""
+  Write-Host "Brave Origin Portable Updater v1.1"
+  Write-Host "================================"
+  Write-Host ""
+
   # 1. Check Brave version (no downloads yet, just the version check)
   $currentVersion = if (Test-Path $exePath) { (Get-Item $exePath).VersionInfo.ProductVersion } else { "Not installed" }
   $release = Invoke-RestMethod -Uri $apiUrl
@@ -57,9 +74,8 @@ try {
   $latestVersion = "$chromiumMajor.$braveVersion"
   $downloadUrl = $asset.browser_download_url
 
-  Write-Host "Current version: $currentVersion"
-  Write-Host "Latest version: $latestVersion"
-  Write-Host
+  Write-Host "Current version: $currentVersion" -ForegroundColor Yellow
+  Write-Host "Latest version: $latestVersion" -ForegroundColor Yellow
 
   $confirm = Read-Host "Do you want to update Brave and Chrome++? (y/N)"
   if ($confirm -ne 'y' -and $confirm -ne 'Y') { exit }
