@@ -1,7 +1,41 @@
 @echo off
-setlocal
+setlocal enabledelayedexpansion
 chcp 65001 >nul
-powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$c = (Get-Content '%~f0' -Raw) -split '::PS_PAYLOAD::' | Select-Object -Last 1; Invoke-Command -ScriptBlock ([scriptblock]::Create($c)) -ArgumentList '%~dp0'"
+
+if "%~1"=="/afterupdate" goto :RUN_PAYLOAD
+
+:: ============================================================
+:: BUOC 0: TU CAP NHAT CHINH NO (update.bat) TRUOC KHI CHAY
+:: ============================================================
+set "TMPBAT=%TEMP%\update_new_%RANDOM%.bat"
+echo Dang kiem tra phien ban moi cua update.bat...
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ^
+  "try { (New-Object Net.WebClient).DownloadFile('https://raw.githubusercontent.com/bibicadotnet/Brave_Origin_Portable/main/update.bat', '%TMPBAT%') } catch { }"
+
+if exist "%TMPBAT%" (
+    fc /b "%TMPBAT%" "%~f0" >nul 2>&1
+    if errorlevel 1 (
+        echo Phat hien phien ban moi, dang cap nhat update.bat...
+        copy /y "%TMPBAT%" "%~f0" >nul
+        del "%TMPBAT%" >nul 2>&1
+        call "%~f0" /afterupdate %*
+        exit /b
+    ) else (
+        del "%TMPBAT%" >nul 2>&1
+        echo update.bat da la phien ban moi nhat.
+    )
+) else (
+    echo Khong tai duoc phien ban moi, tiep tuc voi phien ban hien tai.
+)
+
+:RUN_PAYLOAD
+:: ============================================================
+:: BUOC 1: TACH PHAN POWERSHELL RA FILE TAM ROI CHAY (khong con
+:: bi loi thieu dau nhay do dung [scriptblock]::Create tren chuoi)
+:: ============================================================
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ^
+  "$c = (Get-Content -LiteralPath '%~f0' -Raw) -split '::PS_PAYLOAD::',2 | Select-Object -Last 1; $tmp = Join-Path $env:TEMP ('update_payload_' + [guid]::NewGuid().ToString('N') + '.ps1'); Set-Content -LiteralPath $tmp -Value $c -Encoding UTF8; try { & $tmp '%~dp0' } finally { Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue }"
+
 exit /b
 
 ::PS_PAYLOAD::
@@ -115,15 +149,16 @@ try {
     Write-Warning "Failed to install Chrome++ Next Mini: $_"
   }
 
-  # 5. Run unlock-brave-origin inline (parse its PowerShell payload directly)
+  # 5. Run unlock-brave-origin.bat directly, attached to the SAME console window
+  #    (Start-Process -NoNewWindow -Wait keeps it in this window instead of popping
+  #    a separate one, and lets its own self-contained batch/PS header run as designed)
   $unlockScript = Join-Path $currentDir "unlock-brave-origin.bat"
   if (Test-Path $unlockScript) {
       Write-Host "Running unlock-brave-origin..." -ForegroundColor Yellow
       try {
-          $unlockContent = Get-Content $unlockScript -Raw
-          $unlockPayload = ($unlockContent -split '::PS_PAYLOAD::' | Select-Object -Last 1)
-          if ($unlockPayload) {
-              Invoke-Command -ScriptBlock ([scriptblock]::Create($unlockPayload)) -ArgumentList $currentDir
+          $p = Start-Process -FilePath $unlockScript -WorkingDirectory $currentDir -NoNewWindow -PassThru -Wait
+          if ($p.ExitCode -ne 0) {
+              Write-Warning "unlock-brave-origin exited with code $($p.ExitCode)"
           }
       } catch {
           Write-Warning "Could not run unlock-brave-origin: $_"
@@ -137,16 +172,6 @@ try {
   } else {
     Write-Host "Error or update failed. Expected: $latestVersion, Actual: $newVersion" -ForegroundColor Yellow
   }
-
-  # 6. Self-update: download latest update.bat from GitHub (takes effect on next run)
-  # This MUST be the last step so the file is only overwritten after all code has been read into memory
-  try {
-    $tmpFile = Join-Path $env:TEMP "update.bat.tmp"
-    (New-Object System.Net.WebClient).DownloadFile("https://raw.githubusercontent.com/bibicadotnet/Brave_Origin_Portable/main/update.bat", $tmpFile)
-    if (Test-Path $tmpFile) {
-      Move-Item -Path $tmpFile -Destination (Join-Path $currentDir "update.bat") -Force
-    }
-  } catch { }
 
 } catch {
   Write-Host "Error: $_" -ForegroundColor Red
